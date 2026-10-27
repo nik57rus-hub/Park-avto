@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Учёт авто и рейсов</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding-bottom: 100px; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 16px; }
+        header { text-align: center; color: white; margin-bottom: 20px; }
+        header h1 { font-size: 24px; margin-bottom: 4px; }
+        .sync-status { font-size: 12px; opacity: 0.9; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .sync-dot { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: inline-block; }
+        
+        .tabs { display: flex; background: rgba(255,255,255,0.2); border-radius: 12px; padding: 4px; margin-bottom: 20px; backdrop-filter: blur(10px); overflow-x: auto; gap: 4px; -webkit-overflow-scrolling: touch; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab { flex: 0 0 auto; padding: 10px 14px; text-align: center; color: white; cursor: pointer; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all 0.2s; white-space: nowrap; }
+        .tab.active { background: white; color: #667eea; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); position: relative; }
+        .card-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; }
+        .card-title { font-size: 17px; font-weight: bold; color: #333; }
+        .card-date { font-size: 12px; color: #888; margin-top: 2px; }
+        .card-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; }
+        .info-item { display: flex; flex-direction: column; }
+        .info-label { font-size: 11px; color: #999; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .info-value { color: #333; font-weight: 600; }
+        .info-value.positive { color: #27ae60; }
+        .info-value.negative { color: #e74c3c; }
+        .notes-box { margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 8px; font-size: 13px; color: #555; border-left: 3px solid #667eea; }
+        
+        .delete-btn { background: #ff4757; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .stat-card { background: white; padding: 16px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .stat-value { font-size: 22px; font-weight: bold; color: #667eea; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+
+        .empty-state { text-align: center; color: white; padding: 40px 20px; opacity: 0.9; }
+        .empty-state h2 { margin-bottom: 8px; font-size: 18px; }
+
+        .fab { position: fixed; bottom: 24px; right: 24px; background: white; color: #667eea; width: 60px; height: 60px; border-radius: 50%; border: none; font-size: 32px; cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.25); z-index: 50; display: flex; align-items: center; justify-content: center; transition: transform 0.2s; }
+        .fab:active { transform: scale(0.9); }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; align-items: flex-end; justify-content: center; backdrop-filter: blur(4px); }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 20px 20px 0 0; padding: 24px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; animation: slideUp 0.3s; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-content h2 { margin-bottom: 20px; color: #333; font-size: 20px; }
+        
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; color: #666; font-size: 13px; font-weight: 600; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px; border: 2px solid #e8e8e8; border-radius: 10px; font-size: 16px; outline: none; transition: border-color 0.2s; background: #fafafa; }
+        .form-group textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #667eea; background: white; }
+        
+        .modal-buttons { display: flex; gap: 12px; margin-top: 24px; }
+        .btn { flex: 1; padding: 14px; border: none; border-radius: 10px; font-size: 16px; cursor: pointer; font-weight: 600; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-secondary { background: #f0f0f0; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚛 Учёт авто и рейсов</h1>
+            <div class="sync-status"><span class="sync-dot"></span> Синхронизация активна</div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('trips')">Рейсы</div>
+            <div class="tab" onclick="switchTab('refuels')">Топливо</div>
+            <div class="tab" onclick="switchTab('maintenance')">ТО</div>
+            <div class="tab" onclick="switchTab('fines')">Штрафы</div>
+            <div class="tab" onclick="switchTab('stats')">Итоги</div>
+        </div>
+
+        <div class="tab-content active" id="trips-content"><div id="trips-list"></div></div>
+        <div class="tab-content" id="refuels-content"><div id="refuels-list"></div></div>
+        <div class="tab-content" id="maintenance-content"><div id="maintenance-list"></div></div>
+        <div class="tab-content" id="fines-content"><div id="fines-list"></div></div>
+        <div class="tab-content" id="stats-content">
+            <div class="stats-grid">
+                <div class="stat-card"><div class="stat-value" id="stat-trips">0</div><div class="stat-label">Всего рейсов</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-mileage">0</div><div class="stat-label">Общий пробег</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-income" style="color:#27ae60">0 ₽</div><div class="stat-label">Доход</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-expenses" style="color:#e74c3c">0 ₽</div><div class="stat-label">Все расходы</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-fines" style="color:#e74c3c">0 ₽</div><div class="stat-label">Штрафы</div></div>
+                <div class="stat-card"><div class="stat-value" id="stat-profit">0 ₽</div><div class="stat-label">Чистая прибыль</div></div>
+            </div>
+        </div>
+    </div>
+
+    <button class="fab" onclick="openModal()">+</button>
+
+    <!-- Модалка: Рейс -->
+    <div class="modal" id="modal-trip">
+        <div class="modal-content">
+            <h2>Новый рейс</h2>
+            <div class="form-group"><label>Дата</label><input type="date" id="trip-date"></div>
+            <div class="form-group"><label>Автомобиль</label><input type="text" id="trip-vehicle" placeholder="А123БВ 77"></div>
+            <div class="form-group"><label>Маршрут</label><input type="text" id="trip-route" placeholder="Москва → Тверь"></div>
+            <div class="form-group"><label>Пробег (км)</label><input type="number" id="trip-mileage" placeholder="150"></div>
+            <div class="form-group"><label>Стоимость рейса (₽)</label><input type="number" id="trip-price" placeholder="15000"></div>
+            <div class="form-group"><label>ЗП водителя (₽)</label><input type="number" id="trip-salary" placeholder="5000"></div>
+            <div class="form-group"><label>Доп. информация</label><textarea id="trip-notes" placeholder="Комментарии, особенности груза и т.д."></textarea></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveTrip()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: Топливо -->
+    <div class="modal" id="modal-refuel">
+        <div class="modal-content">
+            <h2>Новая заправка</h2>
+            <div class="form-group"><label>Дата</label><input type="date" id="refuel-date"></div>
+            <div class="form-group"><label>Автомобиль</label><input type="text" id="refuel-vehicle" placeholder="А123БВ 77"></div>
+            <div class="form-group"><label>Объём (литры)</label><input type="number" step="0.1" id="refuel-liters" placeholder="50"></div>
+            <div class="form-group"><label>Стоимость (₽)</label><input type="number" id="refuel-cost" placeholder="2500"></div>
+            <div class="form-group"><label>Пробег на момент заправки</label><input type="number" id="refuel-mileage" placeholder="15000"></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveRefuel()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: ТО -->
+    <div class="modal" id="modal-maintenance">
+        <div class="modal-content">
+            <h2>Обслуживание (ТО)</h2>
+            <div class="form-group"><label>Дата</label><input type="date" id="maint-date"></div>
+            <div class="form-group"><label>Автомобиль</label><input type="text" id="maint-vehicle" placeholder="А123БВ 77"></div>
+            <div class="form-group">
+                <label>Тип работы</label>
+                <select id="maint-type">
+                    <option value="Замена масла">Замена масла</option>
+                    <option value="Замена фильтра">Замена фильтра</option>
+                    <option value="Замена ремня">Замена приводного ремня</option>
+                    <option value="Замена запчасти">Замена запчасти</option>
+                    <option value="Другое">Другое</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Описание / Название</label><input type="text" id="maint-desc" placeholder="Масло 5W-30, фильтр масляный"></div>
+            <div class="form-group"><label>Код запчасти / Артикул</label><input type="text" id="maint-code" placeholder="AB123456"></div>
+            <div class="form-group"><label>Стоимость (₽)</label><input type="number" id="maint-cost" placeholder="3000"></div>
+            <div class="form-group"><label>Пробег на момент ТО</label><input type="number" id="maint-mileage" placeholder="15000"></div>
+            <div class="form-group"><label>Доп. информация</label><textarea id="maint-notes" placeholder="Тип масла, размер ремня (напр. 6PK1000), примечания"></textarea></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveMaintenance()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модалка: Штрафы -->
+    <div class="modal" id="modal-fines">
+        <div class="modal-content">
+            <h2>Новый штраф</h2>
+            <div class="form-group"><label>Дата</label><input type="date" id="fine-date"></div>
+            <div class="form-group"><label>Автомобиль</label><input type="text" id="fine-vehicle" placeholder="А123БВ 77"></div>
+            <div class="form-group"><label>Причина / Тип штрафа</label><input type="text" id="fine-reason" placeholder="Превышение скорости, парковка и т.д."></div>
+            <div class="form-group"><label>Сумма штрафа (₽)</label><input type="number" id="fine-amount" placeholder="500"></div>
+            <div class="form-group"><label>Доп. информация</label><textarea id="fine-notes" placeholder="Номер постановления, кто оплатил, ссылка на фото"></textarea></div>
+            <div class="modal-buttons">
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button class="btn btn-primary" onclick="saveFine()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBitPFI0os_jtGCcKPz8tgtsCJt51LbjZQ",
+            authDomain: "park-628a2.firebaseapp.com",
+            projectId: "park-628a2",
+            storageBucket: "park-628a2.firebasestorage.app",
+            messagingSenderId: "700844893258",
+            appId: "1:700844893258:web:4ee5295bb83e3d2ca632b3",
+            measurementId: "G-63Y80872D7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.db = db;
+        window.appData = { trips: [], refuels: [], maintenance: [], fines: [] };
+        window.currentTab = 'trips';
+
+        // Слушатели реального времени
+        onSnapshot(query(collection(db, "trips"), orderBy("date", "desc")), (snapshot) => {
+            window.appData.trips = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderTrips(); updateStats();
+        });
+
+        onSnapshot(query(collection(db, "refuels"), orderBy("date", "desc")), (snapshot) => {
+            window.appData.refuels = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderRefuels(); updateStats();
+        });
+
+        onSnapshot(query(collection(db, "maintenance"), orderBy("date", "desc")), (snapshot) => {
+            window.appData.maintenance = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderMaintenance(); updateStats();
+        });
+
+        onSnapshot(query(collection(db, "fines"), orderBy("date", "desc")), (snapshot) => {
+            window.appData.fines = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderFines(); updateStats();
+        });
+
+        // Рендеринг
+        window.renderTrips = () => {
+            const list = document.getElementById('trips-list');
+            if (window.appData.trips.length === 0) { list.innerHTML = '<div class="empty-state"><h2>Нет рейсов</h2><p>Нажмите + чтобы добавить</p></div>'; return; }
+            list.innerHTML = window.appData.trips.map(t => `
+                <div class="card">
+                    <div class="card-header">
+                        <div><div class="card-title">${t.vehicle || 'Авто'}</div><div class="card-date">${formatDate(t.date)} • ${t.route || 'Маршрут не указан'}</div></div>
+                        <button class="delete-btn" onclick="deleteItem('trips', '${t.id}')">×</button>
+                    </div>
+                    <div class="card-info">
+                        <div class="info-item"><span class="info-label">Пробег</span><span class="info-value">${t.mileage} км</span></div>
+                        <div class="info-item"><span class="info-label">Стоимость</span><span class="info-value positive">+${Number(t.price||0).toLocaleString()} ₽</span></div>
+                        <div class="info-item"><span class="info-label">ЗП водителя</span><span class="info-value negative">-${Number(t.salary||0).toLocaleString()} ₽</span></div>
+                    </div>
+                    ${t.notes ? `<div class="notes-box">📝 ${t.notes}</div>` : ''}
+                </div>
+            `).join('');
+        };
+
+        window.renderRefuels = () => {
+            const list = document.getElementById('refuels-list');
+            if (window.appData.refuels.length === 0) { list.innerHTML = '<div class="empty-state"><h2>Нет заправок</h2></div>'; return; }
+            list.innerHTML = window.appData.refuels.map(r => `
+                <div class="card">
+                    <div class="card-header">
+                        <div><div class="card-title">${r.vehicle || 'Авто'}</div><div class="card-date">${formatDate(r.date)}</div></div>
+                        <button class="delete-btn" onclick="deleteItem('refuels', '${r.id}')">×</button>
+                    </div>
+                    <div class="card-info">
+                        <div class="info-item"><span class="info-label">Объём</span><span class="info-value">${r.liters} л</span></div>
+                        <div class="info-item"><span class="info-label">Стоимость</span><span class="info-value negative">-${Number(r.cost||0).toLocaleString()} ₽</span></div>
+                        <div class="info-item"><span class="info-label">Пробег</span><span class="info-value">${r.mileage} км</span></div>
+                    </div>
+                </div>
+            `).join('');
+        };
+
+        window.renderMaintenance = () => {
+            const list = document.getElementById('maintenance-list');
+            if (window.appData.maintenance.length === 0) { list.innerHTML = '<div class="empty-state"><h2>Нет записей ТО</h2></div>'; return; }
+            list.innerHTML = window.appData.maintenance.map(m => `
+                <div class="card">
+                    <div class="card-header">
+                        <div><div class="card-title">${m.type}</div><div class="card-date">${formatDate(m.date)} • ${m.vehicle || 'Авто'}</div></div>
+                        <button class="delete-btn" onclick="deleteItem('maintenance', '${m.id}')">×</button>
+                    </div>
+                    <div class="card-info">
+                        <div class="info-item"><span class="info-label">Описание</span><span class="info-value">${m.desc || '-'}</span></div>
+                        <div class="info-item"><span class="info-label">Артикул</span><span class="info-value">${m.code || '-'}</span></div>
+                        <div class="info-item"><span class="info-label">Стоимость</span><span class="info-value negative">-${Number(m.cost||0).toLocaleString()} ₽</span></div>
+                        <div class="info-item"><span class="info-label">Пробег</span><span class="info-value">${m.mileage} км</span></div>
+                    </div>
+                    ${m.notes ? `<div class="notes-box">🔧 ${m.notes}</div>` : ''}
+                </div>
+            `).join('');
+        };
+
+        window.renderFines = () => {
+            const list = document.getElementById('fines-list');
+            if (window.appData.fines.length === 0) { list.innerHTML = '<div class="empty-state"><h2>Штрафов нет 🎉</h2><p>Отличная новость, так держать!</p></div>'; return; }
+            list.innerHTML = window.appData.fines.map(f => `
+                <div class="card">
+                    <div class="card-header">
+                        <div><div class="card-title">${f.reason || 'Штраф'}</div><div class="card-date">${formatDate(f.date)} • ${f.vehicle || 'Авто'}</div></div>
+                        <button class="delete-btn" onclick="deleteItem('fines', '${f.id}')">×</button>
+                    </div>
+                    <div class="card-info">
+                        <div class="info-item"><span class="info-label">Сумма</span><span class="info-value negative">-${Number(f.amount||0).toLocaleString()} ₽</span></div>
+                    </div>
+                    ${f.notes ? `<div class="notes-box">📝 ${f.notes}</div>` : ''}
+                </div>
+            `).join('');
+        };
+
+        window.updateStats = () => {
+            const trips = window.appData.trips;
+            const refuels = window.appData.refuels;
+            const maint = window.appData.maintenance;
+            const fines = window.appData.fines;
+
+            const totalTrips = trips.length;
+            const totalMileage = trips.reduce((sum, t) => sum + Number(t.mileage||0), 0);
+            const income = trips.reduce((sum, t) => sum + Number(t.price||0), 0);
+            
+            const salaryExp = trips.reduce((sum, t) => sum + Number(t.salary||0), 0);
+            const fuelExp = refuels.reduce((sum, r) => sum + Number(r.cost||0), 0);
+            const maintExp = maint.reduce((sum, m) => sum + Number(m.cost||0), 0);
+            const finesExp = fines.reduce((sum, f) => sum + Number(f.amount||0), 0);
+            
+            const totalExpenses = salaryExp + fuelExp + maintExp + finesExp;
+            const profit = income - totalExpenses;
+
+            document.getElementById('stat-trips').textContent = totalTrips;
+            document.getElementById('stat-mileage').textContent = totalMileage.toLocaleString();
+            document.getElementById('stat-income').textContent = income.toLocaleString() + ' ₽';
+            document.getElementById('stat-expenses').textContent = totalExpenses.toLocaleString() + ' ₽';
+            document.getElementById('stat-fines').textContent = finesExp.toLocaleString() + ' ₽';
+            document.getElementById('stat-profit').textContent = profit.toLocaleString() + ' ₽';
+            document.getElementById('stat-profit').style.color = profit >= 0 ? '#27ae60' : '#e74c3c';
+        };
+
+        // Сохранение
+        window.saveTrip = async () => {
+            const data = { date: document.getElementById('trip-date').value, vehicle: document.getElementById('trip-vehicle').value.trim(), route: document.getElementById('trip-route').value.trim(), mileage: Number(document.getElementById('trip-mileage').value)||0, price: Number(document.getElementById('trip-price').value)||0, salary: Number(document.getElementById('trip-salary').value)||0, notes: document.getElementById('trip-notes').value.trim() };
+            if (!data.date || !data.vehicle) { alert('Заполните дату и авто!'); return; }
+            await addDoc(collection(window.db, "trips"), data); closeModal();
+        };
+
+        window.saveRefuel = async () => {
+            const data = { date: document.getElementById('refuel-date').value, vehicle: document.getElementById('refuel-vehicle').value.trim(), liters: Number(document.getElementById('refuel-liters').value)||0, cost: Number(document.getElementById('refuel-cost').value)||0, mileage: Number(document.getElementById('refuel-mileage').value)||0 };
+            if (!data.date || !data.vehicle) { alert('Заполните дату и авто!'); return; }
+            await addDoc(collection(window.db, "refuels"), data); closeModal();
+        };
+
+        window.saveMaintenance = async () => {
+            const data = { date: document.getElementById('maint-date').value, vehicle: document.getElementById('maint-vehicle').value.trim(), type: document.getElementById('maint-type').value, desc: document.getElementById('maint-desc').value.trim(), code: document.getElementById('maint-code').value.trim(), cost: Number(document.getElementById('maint-cost').value)||0, mileage: Number(document.getElementById('maint-mileage').value)||0, notes: document.getElementById('maint-notes').value.trim() };
+            if (!data.date || !data.vehicle) { alert('Заполните дату и авто!'); return; }
+            await addDoc(collection(window.db, "maintenance"), data); closeModal();
+        };
+
+        window.saveFine = async () => {
+            const data = { date: document.getElementById('fine-date').value, vehicle: document.getElementById('fine-vehicle').value.trim(), reason: document.getElementById('fine-reason').value.trim(), amount: Number(document.getElementById('fine-amount').value)||0, notes: document.getElementById('fine-notes').value.trim() };
+            if (!data.date || !data.vehicle) { alert('Заполните дату и авто!'); return; }
+            await addDoc(collection(window.db, "fines"), data); closeModal();
+        };
+
+        window.deleteItem = async (col, id) => {
+            if (confirm('Удалить эту запись?')) { await deleteDoc(doc(window.db, col, id)); }
+        };
+
+        // UI функции
+        window.switchTab = (tab) => {
+            window.currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(`${tab}-content`).classList.add('active');
+        };
+
+        window.openModal = () => {
+            const tab = window.currentTab;
+            const modalId = `modal-${tab === 'trips' ? 'trip' : tab === 'refuels' ? 'refuel' : tab === 'maintenance' ? 'maintenance' : 'fines'}`;
+            document.getElementById(modalId).classList.add('active');
+            const dateInput = document.querySelector(`#${modalId} input[type="date"]`);
+            if (dateInput) dateInput.valueAsDate = new Date();
+        };
+
+        window.closeModal = () => {
+            document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+            document.querySelectorAll('input, textarea').forEach(i => { if (i.type !== 'date') i.value = ''; });
+        };
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const d = new Date(dateStr);
+            return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+
+        document.querySelectorAll('.modal').forEach(m => {
+            m.addEventListener('click', (e) => { if (e.target === m) closeModal(); });
+        });
+    </script>
+</body>
+</html>
